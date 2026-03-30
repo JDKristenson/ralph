@@ -229,18 +229,18 @@ function App() {
   const [visibleCount, setVisibleCount] = useState(1);
   const nodePositions = useRef<{ [key: string]: { x: number; y: number } }>({ ...positions });
 
-  const getNodes = (count: number) => {
+  const getNodes = (count: number, pos: { [key: string]: { x: number; y: number } } = nodePositions.current) => {
     const stepNodes = allSteps.map((step, index) =>
-      createNode(step, index < count, nodePositions.current[step.id])
+      createNode(step, index < count, pos[step.id])
     );
     const noteNodes = notes.map(note => {
       const noteVisible = count >= note.appearsWithStep;
-      return createNoteNode(note, noteVisible, nodePositions.current[note.id]);
+      return createNoteNode(note, noteVisible, pos[note.id]);
     });
     return [...stepNodes, ...noteNodes];
   };
 
-  const initialNodes = getNodes(1);
+  const initialNodes = getNodes(1, positions);
   const initialEdges = edgeConnections.map((conn, index) =>
     createEdge(conn, index < 0)
   );
