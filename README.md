@@ -1,196 +1,58 @@
-# Ralph
+# Ralph — attributed derivative and contribution record
 
-![Ralph](ralph.webp)
+Ralph is a Bash wrapper that repeatedly invokes [Amp](https://ampcode.com) with a coding prompt. This repository also contains a separate React Flow presentation of the intended workflow. **The visualization does not run the agent.**
 
-Ralph is an autonomous AI agent loop that runs [Amp](https://ampcode.com) repeatedly until all PRD items are complete. Each iteration is a fresh Amp instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+## Origins and JD's contribution
 
-Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
+This is an inherited implementation with a small, focused maintenance delta, not a claim that JD created Ralph. The inspected history attributes the original wrapper, prompt, skills, visualization and Pages workflow to **Ryan Carson**. The approach credits **[Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/)**. See [Ryan Carson's article](https://x.com/ryancarson/status/2008548371712135632) and the [upstream reference repository](https://github.com/snarktank/ralph). A repository namespace is not authorship or a license grant.
 
-[Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
+At the audited base [`545e1ed`](https://github.com/JDKristenson/ralph/commit/545e1ed4580e147c742bd4d831550bb3ca3da674), the recorded JD-attributed contribution is:
 
-## Prerequisites
+- [Add ESLint and TypeScript/build CI](https://github.com/JDKristenson/ralph/commit/bde35b62e4990a84a19c62ae8f329480d3f12163).
+- [Temporarily make lint non-blocking](https://github.com/JDKristenson/ralph/commit/8b98407cc2c90cadaa868021658fb5e9988886f6), then [pass static initial positions into `getNodes`](https://github.com/JDKristenson/ralph/commit/fbd867b1d11da939a77725a5cab34e0dad496227) instead of reading the mutable ref during initial rendering.
+- [Restore blocking lint](https://github.com/JDKristenson/ralph/commit/545e1ed4580e147c742bd4d831550bb3ca3da674).
 
-- [Amp CLI](https://ampcode.com) installed and authenticated
-- `jq` installed (`brew install jq` on macOS)
-- A git repository for your project
+That net delta touches the CI workflow and a narrow React correction. Commit metadata supports attribution, not verified human-only authorship. No explicit AI contribution declarations were found in those commit messages; absence of a declaration does not prove absence of assistance. Amp is an execution dependency, not evidence that it authored every file. Upstream acceptance of JD's changes has not been established.
 
-## Setup
+## Start here: visualization only
 
-### Option 1: Copy to your project
+Use this path to inspect the presentation without Amp, credentials or agent permissions. See the [source-backed flowchart setup](flowchart/README.md) for commands and limitations. It uses React 19, TypeScript, Vite 7 and React Flow; the lockfile requires Node **20.19+ on the 20.x line, or 22.12+**. No test script is defined.
 
-Copy the ralph files into your project:
+[![Editable workflow boundaries](docs/ralph-boundaries.svg)](docs/ralph-boundaries.excalidraw)
 
-```bash
-# From your project root
-mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt.md scripts/ralph/
-chmod +x scripts/ralph/ralph.sh
-```
+[Download/edit the Excalidraw source](docs/ralph-boundaries.excalidraw) · [Diagram notes and attribution](docs/README.md). The original [presentation screenshot](ralph-flowchart.png) and [artwork](ralph.webp) remain preserved. The [upstream interactive demo](https://snarktank.github.io/ralph/) is not a verified deployment of this repository.
 
-### Option 2: Install skills globally
+## Agent runner: separate, privileged and potentially billable
 
-Copy the skills to your Amp config for use across all projects:
+**Do not run this merely to preview the project.** The wrapper invokes `amp --dangerously-allow-all`, requests code changes and commits, and can consume paid model/service usage. An iteration limit is not a spending cap or a safety sandbox. Review the current [Amp documentation](https://ampcode.com/manual), permissions and account billing before deliberately opting in. Keep secrets, private data and production access out of the target workspace unless explicitly required and authorized.
 
-```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
-```
+### Inferred setup (not an execution guarantee)
 
-### Configure Amp auto-handoff (recommended)
+Prerequisites: Bash, Git, `jq`, ordinary Unix utilities and a separately installed/configured Amp CLI. The visualization does not need Amp. No credential check or Amp execution was performed for these docs.
 
-Add to `~/.config/amp/settings.json`:
+For an intentionally selected target Git project, copy `ralph.sh` and `prompt.md` into `scripts/ralph/`, make the shell file executable, and create `scripts/ralph/prd.json` using [the example schema](prd.json.example). Review the prompt and all stories before execution. Do not treat the example as a production requirements file.
 
-```json
-{
-  "amp.experimental.autoHandoff": { "context": 90 }
-}
-```
+**Working directory matters:** run from the target project's root. The shell resolves state paths relative to its own location but never changes the process working directory. Amp receives the prompt over stdin, without a prompt-file path. The prompt's relative `prd.json`/`progress.txt` references therefore need explicit adjustment to `scripts/ralph/prd.json` and `scripts/ralph/progress.txt` in the copied prompt (including update instructions); otherwise the shell and agent may use different state files. This repository does not repair that ambiguity at runtime.
 
-This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
+After that review and explicit opt-in, the inherited invocation is `./scripts/ralph/ralph.sh [max_iterations]` (default 10). This is documentation, not a recommendation to run unattended. The [PRD skill](skills/prd/SKILL.md) describes requirements drafting and the [Ralph skill](skills/ralph/SKILL.md) describes conversion to JSON. They are inherited instructions, not guaranteed installed tools. No global configuration change or experimental auto-handoff setting is required by this wrapper.
 
-## Workflow
+### What the shell enforces vs. what the prompt requests
 
-### 1. Create a PRD
+**Implemented in [`ralph.sh`](ralph.sh):** resolve script-local state; initialize progress; track `branchName`; conditionally copy state to an archive and reset progress when the tracked branch name changes; invoke a fresh Amp process each iteration; stop with exit 0 if output contains `<promise>COMPLETE</promise>`; otherwise continue with a two-second delay and exit 1 after the iteration limit. The invocation tolerates failures with `|| true` and does not independently validate story completion. Other shell failures may terminate earlier under `set -e`.
 
-Use the PRD skill to generate a detailed requirements document:
+**Requested in [`prompt.md`](prompt.md), not independently enforced by the wrapper:** check out/create the PRD branch; select one highest-priority incomplete story; implement it; run project quality checks; commit only after passing; update `passes`; append learnings; update relevant `AGENTS.md`; and perform browser verification for frontend work. Availability of the referenced browser skill is environment-dependent. The shell does not parse all story statuses before accepting the completion marker, validate test results, or enforce commit/review policy.
 
-```
-Load the prd skill and create a PRD for [your feature description]
-```
+### State, privacy and recovery
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+- `prd.json`, `progress.txt`, `.last-branch` and `archive/` live beside the shell file. Git history and these files provide cross-iteration state; the prompt is supplied anew each time.
+- On a tracked branch-name change, the shell copies the **currently present** PRD/progress files into a dated folder named from the previous branch, then resets progress. This is not a complete historical snapshot or transactional backup; repeated names/dates can reuse a folder.
+- The inherited prompt requests an Amp thread link in progress logs. Logs, requirements, git history and archives can contain sensitive project context. Review them before sharing or committing; do not publish credentials, private endpoints or personal data. The wrapper prints agent output to the terminal.
+- Retain a recoverable Git baseline and inspect changes manually. Completion output is an agent assertion, not independent verification or a security certification.
 
-### 2. Convert PRD to Ralph format
+## Validation and deployment status
 
-Use the Ralph skill to convert the markdown PRD to JSON:
+At base `545e1ed`, the recorded [CI run passed](https://github.com/JDKristenson/ralph/actions/runs/23726051812); the separate [Pages run failed](https://github.com/JDKristenson/ralph/actions/runs/23726051818). These are pinned historical run results, not guarantees about a later head or a live site. See [the flowchart README](flowchart/README.md) for local validation commands. The existing Pages workflow is retained unchanged; these docs do not enable Pages, change visibility or certify a deployment.
 
-```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
-```
+## License and reuse status
 
-This creates `prd.json` with user stories structured for autonomous execution.
-
-### 3. Run Ralph
-
-```bash
-./scripts/ralph/ralph.sh [max_iterations]
-```
-
-Default is 10 iterations.
-
-Ralph will:
-1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
-3. Implement that single story
-4. Run quality checks (typecheck, tests)
-5. Commit if checks pass
-6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.txt`
-8. Repeat until all stories pass or max iterations reached
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Amp instances |
-| `prompt.md` | Instructions given to each Amp instance |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
-| `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
-| `flowchart/` | Interactive visualization of how Ralph works |
-
-## Flowchart
-
-[![Ralph Flowchart](ralph-flowchart.png)](https://snarktank.github.io/ralph/)
-
-**[View Interactive Flowchart](https://snarktank.github.io/ralph/)** - Click through to see each step with animations.
-
-The `flowchart/` directory contains the source code. To run locally:
-
-```bash
-cd flowchart
-npm install
-npm run dev
-```
-
-## Critical Concepts
-
-### Each Iteration = Fresh Context
-
-Each iteration spawns a **new Amp instance** with clean context. The only memory between iterations is:
-- Git history (commits from previous iterations)
-- `progress.txt` (learnings and context)
-- `prd.json` (which stories are done)
-
-### Small Tasks
-
-Each PRD item should be small enough to complete in one context window. If a task is too big, the LLM runs out of context before finishing and produces poor code.
-
-Right-sized stories:
-- Add a database column and migration
-- Add a UI component to an existing page
-- Update a server action with new logic
-- Add a filter dropdown to a list
-
-Too big (split these):
-- "Build the entire dashboard"
-- "Add authentication"
-- "Refactor the API"
-
-### AGENTS.md Updates Are Critical
-
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Amp automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
-
-Examples of what to add to AGENTS.md:
-- Patterns discovered ("this codebase uses X for Y")
-- Gotchas ("do not forget to update Z when changing W")
-- Useful context ("the settings panel is in component X")
-
-### Feedback Loops
-
-Ralph only works if there are feedback loops:
-- Typecheck catches type errors
-- Tests verify behavior
-- CI must stay green (broken code compounds across iterations)
-
-### Browser Verification for UI Stories
-
-Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
-
-### Stop Condition
-
-When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
-
-## Debugging
-
-Check current state:
-
-```bash
-# See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
-
-# See learnings from previous iterations
-cat progress.txt
-
-# Check git history
-git log --oneline -10
-```
-
-## Customizing prompt.md
-
-Edit `prompt.md` to customize Ralph's behavior for your project:
-- Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
-
-## Archiving
-
-Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
-
-## References
-
-- [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
-- [Amp documentation](https://ampcode.com/manual)
+See [LICENSE-STATUS.md](LICENSE-STATUS.md). No repository-wide license grant was found at the audited base. Inherited code, text and artwork require provenance/license clarification; no blanket MIT grant is added. Preserve existing human/community attribution and any applicable third-party notices. Public availability alone is not permission to redistribute or relicense.
